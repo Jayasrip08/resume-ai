@@ -5,7 +5,7 @@ from vector_db import collection
 from skills import extract_skills
 from ocr import extract_text_from_pdf
 from database import insert_candidate, get_all_candidates
-from s3 import upload_to_s3
+from s3 import upload_to_s3, generate_presigned_url
 import os
 import uuid
 
@@ -80,7 +80,7 @@ async def upload_resume(file: UploadFile = File(...)):
             "message": "Resume processed successfully",
             "file": file.filename,
             "skills": resume_skills,
-            "s3_url": s3_url,
+            "s3_url": generate_presigned_url(s3_url),
             "total_skills_found": len(resume_skills)
         }
 
@@ -121,9 +121,14 @@ def match_resumes(request: MatchRequest):
             similarity_score = (1 - results["distances"][0][i]) * 100
             final_score = min(round(similarity_score + (skill_score * 5), 2), 100)
 
+            # Generate temporary secure link for viewing resume
+            filename = results["metadatas"][0][i].get("filename", "Unknown")
+            presigned_url = generate_presigned_url(filename) if filename != "Unknown" else "Unknown"
+
             response.append({
                 "id": results["ids"][0][i],
-                "filename": results["metadatas"][0][i].get("filename", "Unknown"),
+                "filename": filename,
+                "resume_url": presigned_url,
                 "score": final_score,
                 "similarity_score": round(similarity_score, 2),
                 "matched_skills": matched_skills,
@@ -149,6 +154,17 @@ def match_resumes(request: MatchRequest):
 def list_candidates():
     try:
         candidates = get_all_candidates()
+        
+        # ✅ Generate fresh pre-signed URLs for each candidate
+        for c in candidates:
+            # If the filename in DB is a full URL, extract the key
+            filename = c["filename"]
+            if filename.startswith("http"):
+                filename = filename.split("/")[-1]
+            
+            # Generate temporary secure link
+            c["filename"] = generate_presigned_url(filename)
+            
         return {"candidates": candidates, "total": len(candidates)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
