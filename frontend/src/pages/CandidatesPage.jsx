@@ -86,7 +86,7 @@ export default function CandidatesPage() {
     setError(null)
     try {
       const { data } = await axios.get(`${API_BASE}/candidates`)
-      setCandidates(data.candidates)
+      setCandidates(data.candidates || [])
     } catch (err) {
       setError('System unavailable. Please verify connection and try again.')
     } finally {
@@ -96,13 +96,13 @@ export default function CandidatesPage() {
 
   useEffect(() => { fetchCandidates() }, [])
 
-  const filtered = candidates.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
+  const filtered = (candidates || []).filter(c =>
+    (c.name || '').toLowerCase().includes(search.toLowerCase()) ||
     (c.skills || '').toLowerCase().includes(search.toLowerCase())
   )
 
   const allSkills = new Set(
-    candidates.flatMap(c => (c.skills || '').split(',').map(s => s.trim()).filter(Boolean))
+    (candidates || []).flatMap(c => (c.skills || '').split(',').map(s => s.trim()).filter(Boolean))
   )
 
   return (
@@ -141,7 +141,7 @@ export default function CandidatesPage() {
               </div>
               <div>
                 <div className="stat-value" style={{ fontSize: '1.5rem' }}>
-                  {candidates.length > 0
+                  {candidates && candidates.length > 0
                     ? (candidates.reduce((a, c) => a + (c.skills || '').split(',').filter(Boolean).length, 0) / candidates.length).toFixed(1)
                     : 0}
                 </div>
